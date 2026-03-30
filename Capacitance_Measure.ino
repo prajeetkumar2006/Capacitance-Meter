@@ -25,16 +25,16 @@ Serial.begin(9600);
 
 void discharge(){
   Serial.println("Discharging");
-  //pinMode(D9, OUTPUT);          //470K
-  //pinMode(D10, OUTPUT);         //680
+  pinMode(D9, OUTPUT);          //470K
+  pinMode(D10, OUTPUT);         //680
   pinMode(D8, OUTPUT);            //680
   pinMode(D11, OUTPUT);           //470K
 
-  //digitalWrite(D9, LOW);
-  //digitalWrite(D10, HIGH);
-  digitalWrite(D8, HIGH);
+  digitalWrite(D9, LOW);
+  digitalWrite(D10, LOW);
+  digitalWrite(D8, LOW);
   digitalWrite(D11, LOW);
-  delay(5000);
+  while(analogRead(TP1)>0);
 }
 
 void charge(){
