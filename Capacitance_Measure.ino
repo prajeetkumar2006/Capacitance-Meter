@@ -17,6 +17,8 @@ double Cx = 0;
 double t = 0;
 double st = 0;
 float Vx = 0;
+float Va = 0;
+float Vb = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -24,19 +26,28 @@ void setup() {
   pinMode(TP2, INPUT);
 }
 
-
 void loop() {
   discharge();
   delay(500); 
-  charge();
 
-  // FIX: Added parentheses around (R1 + R3)
-  // Without parentheses, it divides t by R1 then adds R3 to the result.
-  Cx = ((double)t / 1000.0) / (R2 + R3); 
-  
+  // Try the small capacitor measurement first
+  if (charge_1_with_timeout()) {
+    // If charge_1 finished within 500ms, calculate using small cap formula
+    Cx = ((double)t / 1000.0) / (R2 + R3); 
+    Serial.print("Range: Small | ");
+  } else {
+    // If it timed out, it's a big capacitor. Discharge and use charge_2
+    discharge();
+    delay(500);
+    charge_2();
+    // Your big value formula
+    Cx = (double(t / 1000.0)) / ((R1 + R3) * (log((5.0 - (Va * 0.004882)) / (5.0 - (Vb * 0.004882)))));
+    Serial.print("Range: Large | ");
+  }
+
   Serial.print("Capacitance : ");
   Serial.println(Cx * 1000000, 12);
-  Serial.print("Time (ms): "); // Note: millis() gives ms, not us
+  Serial.print("Time (ms): "); 
   Serial.println(t, 3);
   Serial.println("--------------------------------------");
   
@@ -44,7 +55,7 @@ void loop() {
 }
 
 void discharge() {
-  Serial.println("Discharging");
+  Serial.println("Discharging...");
   pinMode(D8, OUTPUT);
   pinMode(D9, OUTPUT);
   pinMode(D10, OUTPUT);
@@ -55,10 +66,7 @@ void discharge() {
   digitalWrite(D10, LOW);
   digitalWrite(D11, LOW);
 
-  // FIX: Using > 2 instead of > 0 to prevent code from hanging on ADC noise
   while (analogRead(TP1) > 2); 
-
-  Serial.println("Discharging");
 
   pinMode(D8, INPUT);
   pinMode(D9, INPUT);
@@ -67,31 +75,50 @@ void discharge() {
   delay(100);
 }
 
-void charge() {
-  Serial.println("charging");
+// Modified charge_1 to detect if the capacitor is too big
+bool charge_1_with_timeout() {
+  Serial.println("Testing for small capacitor...");
   
   pinMode(D9, OUTPUT);
   pinMode(D10, OUTPUT);
-  //pinMode(D8, OUTPUT);
-  //pinMode(D11, OUTPUT);
 
   digitalWrite(D9, HIGH);
   digitalWrite(D10, LOW);
-  //digitalWrite(D8, HIGH);
-  //digitalWrite(D11, LOW);
 
   st = millis();
   
-  //Serial.println(analogRead(TP1));
   while (analogRead(TP1) < 648) { 
+    t = millis() - st;
+    if (t > 500) { // If it takes longer than 0.5s, it's not a "small" capacitor
+       return false; 
+    }
+    
     ADC_1 = analogRead(TP1);
     Vx = ADC_1 * 0.004882;
-    Serial.println(Vx);
+    // Serial.println(Vx); 
   }
+
+  return true; // Successfully measured a small capacitor
+}
+
+void charge_2() { // for capacitor values more than 10uF
+  Serial.println("Charging big capacitor...");
+  
+  pinMode(D10, OUTPUT);
+  pinMode(D8, OUTPUT);
+
+  digitalWrite(D10, LOW);
+  digitalWrite(D8, HIGH);
+  
+  Va = analogRead(TP1);
+  st = millis();
+  
+  while (analogRead(TP1) < 716) { 
+    ADC_1 = analogRead(TP1);
+    Vx = ADC_1 * 0.004882;
+  }
+  Vb = analogRead(TP1);
   
   t = millis() - st;
-  
   delay(100);
-  //Serial.println((float)t);
-  //Vx = ADC_1 * 0.004882;
 }
